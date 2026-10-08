@@ -415,12 +415,12 @@ def build_api_text(data):
             break
 
     output = io.StringIO(newline="")
-    output.write("*vpn_servers\\r\\n")
-    output.write("#" + ",".join(header) + "\\r\\n")
+    output.write("*vpn_servers\r\n")
+    output.write("#" + ",".join(header) + "\r\n")
 
     writer = csv.writer(
         output,
-        lineterminator="\\r\\n",
+        lineterminator="\r\n",
         quoting=csv.QUOTE_MINIMAL,
     )
 
