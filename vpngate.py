@@ -152,11 +152,24 @@ def parse_csv(text):
     rows = []
     for ln in data_lines:
         fields = next(csv.reader(io.StringIO(ln)))
-        if len(fields) < 7: continue
+        if len(fields) < 7:
+            continue
+        # VPN Gate 官方 API 的字段数可能随版本增加，因此补齐到表头长度。
+        if len(fields) < len(header):
+            fields += [""] * (len(header) - len(fields))
         host = fields[pos["hostname"]].strip()
         ip = fields[pos["ip"]].strip()
-        if not host or not ip: continue
-        rows.append({"host": host, "ip": ip, "country_long": fields[pos["countrylong"]].strip(), "country_short": fields[pos["countryshort"]].strip(), "config_b64": fields[pos["openvpn_configdata_base64"]].strip()})
+        if not host or not ip:
+            continue
+        rows.append({
+            "host": host,
+            "ip": ip,
+            "country_long": fields[pos["countrylong"]].strip(),
+            "country_short": fields[pos["countryshort"]].strip(),
+            "config_b64": fields[pos["openvpn_configdata_base64"]].strip(),
+            "_api_header": header,
+            "_api_fields": fields,
+        })
     return rows
 
 def parse_mirror_json(data):
@@ -172,7 +185,41 @@ def parse_mirror_json(data):
         host = str(s.get("hostname") or s.get("host") or "").strip()
         ip = str(s.get("ip") or "").strip()
         if not host or not ip: continue
-        rows.append({"host": host, "ip": ip, "country_long": str(s.get("countrylong") or s.get("country_long") or s.get("country") or "").strip(), "country_short": str(s.get("countryshort") or s.get("country_short") or "").strip(), "config_b64": str(s.get("openvpn_configdata_base64") or s.get("config_b64") or "").strip()})
+        country_long = str(s.get("countrylong") or s.get("country_long") or s.get("country") or "").strip()
+        country_short = str(s.get("countryshort") or s.get("country_short") or "").strip()
+        config_b64 = str(s.get("openvpn_configdata_base64") or s.get("config_b64") or "").strip()
+
+        # 镜像没有官方 API 的完整原始字段时，构造同样的 15 列格式。
+        api_header = [
+            "HostName", "IP", "Score", "Ping", "Speed",
+            "CountryLong", "CountryShort", "NumVpnSessions", "Uptime",
+            "TotalUsers", "TotalTraffic", "LogType", "Operator",
+            "Message", "OpenVPN_ConfigData_Base64",
+        ]
+        api_fields = [
+            host, ip,
+            str(s.get("score") or ""),
+            str(s.get("ping") or ""),
+            str(s.get("speed") or ""),
+            country_long, country_short,
+            str(s.get("numvpnsessions") or s.get("num_vpn_sessions") or ""),
+            str(s.get("uptime") or ""),
+            str(s.get("totalusers") or s.get("total_users") or ""),
+            str(s.get("totaltraffic") or s.get("total_traffic") or ""),
+            str(s.get("logtype") or ""),
+            str(s.get("operator") or ""),
+            str(s.get("message") or ""),
+            config_b64,
+        ]
+        rows.append({
+            "host": host,
+            "ip": ip,
+            "country_long": country_long,
+            "country_short": country_short,
+            "config_b64": config_b64,
+            "_api_header": api_header,
+            "_api_fields": api_fields,
+        })
     return rows
 
 # ---------------------------------------------------------------------------
@@ -198,7 +245,15 @@ def to_sstp_nodes(rows):
         host = r["host"]
         if not host.endswith(".opengw.net"):
             host = f"{host}.opengw.net"
-        nodes.append({"host": host, "port": port, "ip": r["ip"], "country": r["country_long"], "country_code": r["country_short"]})
+        nodes.append({
+            "host": host,
+            "port": port,
+            "ip": r["ip"],
+            "country": r["country_long"],
+            "country_code": r["country_short"],
+            "_api_header": r.get("_api_header"),
+            "_api_fields": r.get("_api_fields"),
+        })
     return nodes
 
 def dedupe(nodes):
@@ -235,6 +290,9 @@ def check_one(node, session):
     out["checked_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     out["exit"] = None
     out["residential"] = "unknown"
+    # 保留 VPN Gate 原始 API 行，后续生成 public/api.txt 时可做到字段格式不变。
+    out["_api_header"] = node.get("_api_header")
+    out["_api_fields"] = node.get("_api_fields")
     try:
         r = session.get(url, timeout=CHECK_TIMEOUT, headers={"User-Agent": "Mozilla/5.0 (gate-checker)"})
         if r.status_code != 200:
@@ -330,6 +388,66 @@ def build_nodes_text(data):
             lines.append(f"{entry}#{zh}-机房-{i:02d}$sstp://vpn:vpn@{n['host']}:{n['port']}")
     return "\n".join(lines) + "\n"
 
+def build_api_text(data):
+    """
+    生成与 VPN Gate /api/iphone/ 一致的 CSV 文本。
+
+    输出格式：
+      * 第一行：*vpn_servers
+      * 第二行：#HostName,IP,Score,...,OpenVPN_ConfigData_Base64
+      * 后续：仅输出本次 SSTP 检测成功的节点
+    """
+    default_header = [
+        "HostName", "IP", "Score", "Ping", "Speed",
+        "CountryLong", "CountryShort", "NumVpnSessions", "Uptime",
+        "TotalUsers", "TotalTraffic", "LogType", "Operator",
+        "Message", "OpenVPN_ConfigData_Base64",
+    ]
+
+    available = [n for n in data.get("available", []) if n.get("_api_fields")]
+
+    # 优先使用官方 API 原始表头；镜像回退时使用标准 15 列。
+    header = default_header
+    for n in available:
+        candidate = n.get("_api_header")
+        if candidate:
+            header = candidate
+            break
+
+    output = io.StringIO(newline="")
+    output.write("*vpn_servers\\r\\n")
+    output.write("#" + ",".join(header) + "\\r\\n")
+
+    writer = csv.writer(
+        output,
+        lineterminator="\\r\\n",
+        quoting=csv.QUOTE_MINIMAL,
+    )
+
+    for n in available:
+        fields = list(n["_api_fields"])
+
+        # 防止源 API 将来增加字段导致长度不一致。
+        if len(fields) < len(header):
+            fields += [""] * (len(header) - len(fields))
+        elif len(fields) > len(header):
+            fields = fields[:len(header)]
+
+        # 保证输出节点与当前检测到的实际 IP 一致。
+        try:
+            ip_idx = next(
+                i for i, h in enumerate(header)
+                if h.strip().lower() == "ip"
+            )
+            fields[ip_idx] = n.get("ip") or fields[ip_idx]
+        except StopIteration:
+            pass
+
+        writer.writerow(fields)
+
+    return output.getvalue()
+
+
 def write_outputs(data):
     os.makedirs(PUBLIC_DIR, exist_ok=True)
     data_path = os.path.join(PUBLIC_DIR, "data.json")
@@ -351,7 +469,11 @@ def write_outputs(data):
     with open(nodes_path, "w", encoding="utf-8") as f:
         f.write(build_nodes_text(data))
 
-    return data_path, html_path, nodes_path
+    api_path = os.path.join(PUBLIC_DIR, "api.txt")
+    with open(api_path, "w", encoding="utf-8", newline="") as f:
+        f.write(build_api_text(data))
+
+    return data_path, html_path, nodes_path, api_path
 
 # ---------------------------------------------------------------------------
 # main
@@ -396,10 +518,11 @@ def main():
     log("RESULT", f"可用节点: {len(success)}")
     log("RESULT", f"国家数量: {data['stats']['countries']}")
 
-    data_path, html_path, nodes_path = write_outputs(data)
+    data_path, html_path, nodes_path, api_path = write_outputs(data)
     log("WEBSITE", f"生成 {os.path.relpath(data_path, REPO_DIR)}")
     log("WEBSITE", f"生成 {os.path.relpath(html_path, REPO_DIR)}")
     log("WEBSITE", f"生成 {os.path.relpath(nodes_path, REPO_DIR)}")
+    log("WEBSITE", f"生成 {os.path.relpath(api_path, REPO_DIR)}")
     log("USAGE", f"自动轮换: 把 {NODES_URL} 填入 edgetunnel 后台「自定义优选IP」框 (一次配置, 之后每 30 分钟自动更新)")
     log("WEBSITE", "完成 (GitHub Pages 部署由 workflow 执行)")
 
