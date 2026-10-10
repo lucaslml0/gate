@@ -229,6 +229,7 @@ def main():
     if os.environ.get("GENERATE_ONLY", "").strip().lower() in {"1", "true", "yes", "on"}:
         try:
             nodes = get_nodes()
+            print(nodes)
             output_path = write_nodes(nodes)
             print(f"[OK] 已写入 {output_path}，节点数={len(nodes)}")
             if not nodes:
