@@ -2,7 +2,7 @@
 
 自动抓取 [VPN Gate](https://www.vpngate.net/) 的 SSTP 家宽/机房节点，调用检测 Worker 逐个验证可用性，按国家分组、标注住宅/机房，生成可直接通过 **URL 自动轮换** 的节点清单。**每 30 分钟自动更新一次。**
 
-> 核心价值：VPN Gate 的 SSTP 节点 30 分钟就换一批，手动测试筛选太痛苦。本仓库把它全自动了——你只需把 `nodes.txt` 的网址填进 edgetunnel 后台一次，之后节点每 30 分钟自动换，零手动。
+> 核心价值：VPN Gate 的 SSTP 节点 30 分钟就换一批，手动测试筛选太痛苦。本仓库把它全自动了——你只需把 `jiedian.txt` 的网址填进 edgetunnel 后台一次，之后节点每 30 分钟自动换，零手动。
 
 ---
 
@@ -22,10 +22,10 @@ VPN Gate 官方源
 保留成功节点 → 按国家分组 → 住宅/机房标注 → 延迟排序
       │
       ▼
-生成 nodes.txt (GitHub Pages 发布)
+生成 jiedian.txt (GitHub Pages 发布)
       │
       ▼
-edgetunnel 后台「自定义优选IP」框填 https://…/nodes.txt
+edgetunnel 后台「自定义优选IP」框填 https://…/jiedian.txt
       │  edgetunnel 每次生成订阅时自动 fetch → 解析 $sstp:// → 套链式代理
       ▼
 客户端订阅 edgetunnel 订阅 → 使用 SSTP 家宽节点 (每 30 分钟自动换)
@@ -52,7 +52,7 @@ edgetunnel 后台「自定义优选IP」框填 https://…/nodes.txt
 8. 浏览器访问 `https://你的域名/admin`，登录后台
 9. **在后台首页记下你的 UUID 和节点域名**（后面要用）
 
-> **关键**：`UUID` 和 `节点域名` 是 edgetunnel 自己的配置，**不需要**在 `vpngate.py` 中设置。`vpngate.py` 只负责生成 `nodes.txt`，edgetunnel 会用它自己的 UUID/域名去生成最终订阅。
+> **关键**：`UUID` 和 `节点域名` 是 edgetunnel 自己的配置，**不需要**在 `vpngate.py` 中设置。`vpngate.py` 只负责生成 `jiedian.txt`，edgetunnel 会用它自己的 UUID/域名去生成最终订阅。
 
 ### 第 2 步：部署检测 Worker（CheckSocks5）
 
@@ -88,7 +88,7 @@ edgetunnel 后台「自定义优选IP」框填 https://…/nodes.txt
 
 跑完后，你的站点地址是：
 ~~~text
-https://你的GitHub用户名.github.io/仓库名/nodes.txt
+https://你的GitHub用户名.github.io/仓库名/jiedian.txt
 ~~~
 浏览器打开，能看到一堆 `优选域名:443#国家-住宅-XX …` 的行，就说明全部打通了。
 
@@ -99,12 +99,12 @@ https://你的GitHub用户名.github.io/仓库名/nodes.txt
 1. 进 edgetunnel 后台（你的域名/admin），找到「自定义优选IP」文本框
 2. 粘贴**一行网址**：
    ~~~text
-   https://你的GitHub用户名.github.io/仓库名/nodes.txt
+   https://你的GitHub用户名.github.io/仓库名/jiedian.txt
    ~~~
 3. 点保存
-4. 客户端刷新订阅 → 每次刷新 edgetunnel 都重新拉取一次 nodes.txt，节点自动更新
+4. 客户端刷新订阅 → 每次刷新 edgetunnel 都重新拉取一次 jiedian.txt，节点自动更新
 
-> 原理：`nodes.txt` 是纯节点行版本（无注释头），每行 `入口域名:443#国家-住宅-01$sstp://vpn:vpn@节点:端口`。edgetunnel 下次生成订阅时会 fetch 这个网址、逐行解析成优选入口 + 链式代理指令。你只填一次，之后节点每 30 分钟自动换、零手动。
+> 原理：`jiedian.txt` 是纯节点行版本（无注释头），每行 `入口域名:443#国家-住宅-01$sstp://vpn:vpn@节点:端口`。edgetunnel 下次生成订阅时会 fetch 这个网址、逐行解析成优选入口 + 链式代理指令。你只填一次，之后节点每 30 分钟自动换、零手动。
 
 ---
 
