@@ -9,28 +9,20 @@ on:
         type: string
         default: ""
       protocol:
-        description: "节点协议：vless、outline、trojan、all"
+        description: "节点协议：vless、outline、trojan、all；留空则读取仓库变量 PROTOCOL"
         required: false
-        type: choice
-        options:
-          - vless
-          - outline
-          - trojan
-          - all
-        default: vless
+        type: string
+        default: ""
       limit:
         description: "输出节点数量（1-500）"
         required: false
         type: string
         default: ""
       online_only:
-        description: "只输出在线节点"
+        description: "只输出在线节点（true/false）；留空则读取仓库变量 ONLINE_ONLY"
         required: false
-        type: choice
-        options:
-          - "true"
-          - "false"
-        default: "true"
+        type: string
+        default: ""
 
 permissions:
   contents: read
