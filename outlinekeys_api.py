@@ -224,6 +224,12 @@ class APIHandler(BaseHTTPRequestHandler):
 
 def main():
     print(f"[START] source={BASE_URL} country={DEFAULT_COUNTRY} protocol={DEFAULT_PROTOCOL} limit={DEFAULT_LIMIT}")
+    # 启动时先生成默认节点文件；上游暂时不可用时仍启动 API，后续请求可重试。
+    try:
+        initial_nodes = get_nodes()
+        print(f"[START] 已写入 {write_nodes(initial_nodes)}，节点数={len(initial_nodes)}")
+    except Exception as exc:
+        print(f"[WARN] 初始生成 jiedian.txt 失败，API 仍会启动：{type(exc).__name__}: {exc}", file=sys.stderr)
     print(f"[START] API: http://{HOST}:{PORT}/api?country=US&protocol=vless&limit=10")
     server = ThreadingHTTPServer((HOST, PORT), APIHandler)
     try:
