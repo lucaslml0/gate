@@ -7,7 +7,7 @@ VPN Gate SSTP 节点检测流水线 (精简版)
   2. 只保留带 TCP 入口的 SSTP 节点
   3. 去重
   4. 并发调用检测 Worker
-  5. 生成 public/data.json + public/index.html + public/jiedian.txt
+  5. 生成 public/data.json + public/index.html + public/nodes.txt
 """
 
 import base64
@@ -362,7 +362,7 @@ EDGE_HOSTS = [
     if h.strip()
 ]
 
-NODES_URL = os.environ.get("NODES_URL", "https://lucaslml0.github.io/gate/jiedian.txt")
+NODES_URL = os.environ.get("NODES_URL", "https://lucaslml0.github.io/gate/nodes.txt")
 
 def build_nodes_text(data):
     """生成纯节点行版本 (无注释): 每行 = 入口地址#名字$sstp://..."""
@@ -465,15 +465,15 @@ def write_outputs(data):
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(html)
 
-    jiedian_path = os.path.join(PUBLIC_DIR, "jiedian.txt")
-    with open(jiedian_path, "w", encoding="utf-8") as f:
+    nodes_path = os.path.join(PUBLIC_DIR, "nodes.txt")
+    with open(nodes_path, "w", encoding="utf-8") as f:
         f.write(build_nodes_text(data))
 
     api_path = os.path.join(PUBLIC_DIR, "api.txt")
     with open(api_path, "w", encoding="utf-8", newline="") as f:
         f.write(build_api_text(data))
 
-    return data_path, html_path, jiedian_path, api_path
+    return data_path, html_path, nodes_path, api_path
 
 # ---------------------------------------------------------------------------
 # main
@@ -518,10 +518,10 @@ def main():
     log("RESULT", f"可用节点: {len(success)}")
     log("RESULT", f"国家数量: {data['stats']['countries']}")
 
-    data_path, html_path, jiedian_path, api_path = write_outputs(data)
+    data_path, html_path, nodes_path, api_path = write_outputs(data)
     log("WEBSITE", f"生成 {os.path.relpath(data_path, REPO_DIR)}")
     log("WEBSITE", f"生成 {os.path.relpath(html_path, REPO_DIR)}")
-    log("WEBSITE", f"生成 {os.path.relpath(jiedian_path, REPO_DIR)}")
+    log("WEBSITE", f"生成 {os.path.relpath(nodes_path, REPO_DIR)}")
     log("WEBSITE", f"生成 {os.path.relpath(api_path, REPO_DIR)}")
     log("USAGE", f"自动轮换: 把 {NODES_URL} 填入 edgetunnel 后台「自定义优选IP」框 (一次配置, 之后每 30 分钟自动更新)")
     log("WEBSITE", "完成 (GitHub Pages 部署由 workflow 执行)")
