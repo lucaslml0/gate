@@ -224,7 +224,21 @@ class APIHandler(BaseHTTPRequestHandler):
 
 def main():
     print(f"[START] source={BASE_URL} country={DEFAULT_COUNTRY} protocol={DEFAULT_PROTOCOL} limit={DEFAULT_LIMIT}")
-    # 启动时先生成默认节点文件；上游暂时不可用时仍启动 API，后续请求可重试。
+
+    # GitHub Actions 中只生成文件并退出，不启动常驻 HTTP API 服务。
+    if os.environ.get("GENERATE_ONLY", "").strip().lower() in {"1", "true", "yes", "on"}:
+        try:
+            nodes = get_nodes()
+            output_path = write_nodes(nodes)
+            print(f"[OK] 已写入 {output_path}，节点数={len(nodes)}")
+            if not nodes:
+                print("[WARN] 没有抓取到符合条件的节点", file=sys.stderr)
+            return
+        except Exception as exc:
+            print(f"[ERROR] 生成节点文件失败：{type(exc).__name__}: {exc}", file=sys.stderr)
+            raise SystemExit(1)
+
+    # 常驻 API 模式：启动时先尝试生成默认节点文件；失败时 API 仍可启动。
     try:
         initial_nodes = get_nodes()
         print(f"[START] 已写入 {write_nodes(initial_nodes)}，节点数={len(initial_nodes)}")
