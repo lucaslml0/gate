@@ -2,6 +2,35 @@ name: VPN Gate Node Check
 
 on:
   workflow_dispatch:
+    inputs:
+      country:
+        description: "节点国家（例如 US、JP、SG、ALL）"
+        required: false
+        type: string
+        default: ""
+      protocol:
+        description: "节点协议：vless、outline、trojan、all"
+        required: false
+        type: choice
+        options:
+          - vless
+          - outline
+          - trojan
+          - all
+        default: vless
+      limit:
+        description: "输出节点数量（1-500）"
+        required: false
+        type: string
+        default: ""
+      online_only:
+        description: "只输出在线节点"
+        required: false
+        type: choice
+        options:
+          - "true"
+          - "false"
+        default: "true"
 
 permissions:
   contents: read
@@ -16,6 +45,15 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Action input 优先；未填写时使用仓库 Variables；最后使用默认值。
+      COUNTRY: ${{ inputs.country || vars.COUNTRY || 'US' }}
+      PROTOCOL: ${{ inputs.protocol || vars.PROTOCOL || 'vless' }}
+      LIMIT: ${{ inputs.limit || vars.LIMIT || '50' }}
+      ONLINE_ONLY: ${{ inputs.online_only || vars.ONLINE_ONLY || 'true' }}
+      MAX_PAGES: ${{ vars.MAX_PAGES || '10' }}
+      OUTPUT_FILE: public/jiedian.txt
+      GENERATE_ONLY: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,6 +73,17 @@ jobs:
           CHECK_WORKER: "https://check.socks5.cmliussss.net/check?sstp=vpn:vpn@"
           CHECK_CONCURRENCY: "32"
           CHECK_TIMEOUT: "90"
+
+      - name: Generate OutlineKeys jiedian.txt
+        run: python outlinekeys_api.py
+        env:
+          COUNTRY: ${{ env.COUNTRY }}
+          PROTOCOL: ${{ env.PROTOCOL }}
+          LIMIT: ${{ env.LIMIT }}
+          ONLINE_ONLY: ${{ env.ONLINE_ONLY }}
+          MAX_PAGES: ${{ env.MAX_PAGES }}
+          OUTPUT_FILE: ${{ env.OUTPUT_FILE }}
+          GENERATE_ONLY: "true"
 
       - name: Ensure GitHub Pages is enabled (one-time auto setup)
         run: |
