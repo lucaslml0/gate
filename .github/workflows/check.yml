@@ -1,11 +1,12 @@
 name: VPN Gate Node Check
-
 on:
+  # 支持手动触发
+  workflow_dispatch: 
+  
   # 每小时第 7、37 分钟运行，即每 30 分钟一次；避开整点高峰
   schedule:
     - cron: "7,37 * * * *"
-  # 支持手动触发
-  workflow_dispatch: true
+
 
 permissions:
   contents: read
