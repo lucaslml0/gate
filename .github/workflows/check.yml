@@ -7,22 +7,22 @@ on:
         description: "节点国家（例如 US、JP、SG、ALL）"
         required: false
         type: string
-        default: ""
+        default: "ALL"
       protocol:
         description: "节点协议：vless、outline、trojan、all；留空则读取仓库变量 PROTOCOL"
         required: false
         type: string
-        default: ""
+        default: "vless"
       limit:
         description: "输出节点数量（1-500）"
         required: false
         type: string
-        default: ""
+        default: "50"
       online_only:
         description: "只输出在线节点（true/false）；留空则读取仓库变量 ONLINE_ONLY"
         required: false
         type: string
-        default: ""
+        default: "true"
 
 permissions:
   contents: read
